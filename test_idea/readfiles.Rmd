@@ -1,0 +1,125 @@
+---
+title: "reading_files_overlays"
+output: html_document
+---
+
+## Reading files 
+
+In this part I am going to read files. Files are BlackMtnLRect, BM, BM_modified_TC_FireHist. 
+
+```{r}
+library(sf)
+library(tidyverse)
+library(raster)
+library(rasterVis)
+library(reshape2)
+library(akima)
+```
+
+
+```{r}
+blc_mnt <- raster('../Data/BlackMtnLRect.tif')
+bm <- raster('../Data/BM.tif')
+bm_firhist <- read_sf('../Data/BM_modified_TC_FireHist.shp')
+
+
+
+
+
+levelplot(blc_mnt, par.settings = BTCTheme )
+
+levelplot(bm,par.settings = GrTheme) 
+  
+
+plot3D(bm)
+
+# levelplot(blc_mnt, par.settings = magmaTheme ) +
+#   levelplot(bm,par.settings = GrTheme)
+
+
+
+ggplot()+
+geom_sf(data = bm_firhist,aes(fill = IGNITION))
+
+
+
+
+```
+
+
+
+```{r}
+
+levelplot(bm,par.settings = GrTheme)
+
+```
+
+
+
+
+
+```{r}
+
+extent(bm_firhist %>% 
+  filter(OBJECTID == 172))
+
+
+bm_firhist %>% 
+  filter(OBJECTID == 172)
+
+crs(bm_firhist)
+
+
+st_crs(bm_firhist)
+r <- "+proj=utm +zone=55 +south +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs"
+crs(bm)
+
+
+
+prj_rstr_dem  <- projectRaster(bm,crs = r,method='bilinear')
+
+
+plot3D(prj_rstr_dem)
+
+```
+
+
+
+```{r}
+
+
+
+crp_172 <- crop(prj_rstr_dem,extent(bm_firhist %>% 
+  filter(OBJECTID == 172)))
+
+
+plot3D(crp_172)
+
+z_172 <- raster::extract(prj_rstr_dem,bm_firhist %>% 
+  filter(OBJECTID == 172),method = "bilinear",df = T,cellnumbers = T)
+
+ints_172 <- raster::intersect(prj_rstr_dem, bm_firhist %>% filter(OBJECTID == 172))
+
+plot3D(ints_172)
+
+bm_firhist %>% 
+  filter(OBJECTID == 172) %>% 
+  st_coordinates()
+
+str(ints_172)
+str(z_172)
+
+xy_172 <- coordinates(prj_rstr_dem)[z_172$cell,]
+
+s_172 <- cbind(data.frame(xy_172),z =z_172$BM)
+
+rgl::plot3d(s_172$x,s_172$y,s_172$z)
+
+
+ipl172 <- interp(s_172$x,s_172$y,s_172$z)
+
+
+rgl::surface3d(ipl172$x,ipl172$y,ipl172$z)
+
+```
+
