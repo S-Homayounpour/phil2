@@ -9,11 +9,15 @@ In this part I am going to read files. Files are BlackMtnLRect, BM, BM_modified_
 
 ```{r}
 library(sf)
+library(sp)
 library(tidyverse)
 library(raster)
 library(rasterVis)
 library(reshape2)
 library(akima)
+library(RColorBrewer)
+library(viridis)
+library(scales)
 ```
 
 
@@ -33,8 +37,7 @@ levelplot(bm,par.settings = GrTheme)
 
 plot3D(bm)
 
-# levelplot(blc_mnt, par.settings = magmaTheme ) +
-#   levelplot(bm,par.settings = GrTheme)
+
 
 
 
@@ -119,7 +122,95 @@ rgl::plot3d(s_172$x,s_172$y,s_172$z)
 ipl172 <- interp(s_172$x,s_172$y,s_172$z)
 
 
-rgl::surface3d(ipl172$x,ipl172$y,ipl172$z)
+colZ <- brewer.pal(9,"OrRd")
+rgl::surface3d(ipl172$x,ipl172$y,ipl172$z,color = colZ,alpha=0.75)
+
 
 ```
+
+
+
+
+
+```{r}
+
+     x <- sampleRegular(prj_rstr_dem, size=1e5, asRaster=TRUE)
+                  X <- xFromCol(x,1:ncol(x))
+                  Y <- yFromRow(x, nrow(x):1)
+                  Z <- t((getValues(x, format='matrix'))[nrow(x):1,])
+                  
+                  background <- min(Z, na.rm=TRUE) - 1
+                  Z[is.na(Z)] <- background
+                  
+                  zlim <- range(Z)
+                  zlen <- zlim[2] - zlim[1] + 1
+                  xlen <- max(X) - min(X)
+                  ylen <- max(Y) - min(Y)
+                  at = 8
+                  at <- do.breaks(zlim, at)
+                  col <- viridis_pal(option = "magma",direction = -1)(length(at))
+                  zcolor <- level.colors(Z, at=at, col.regions= col)
+                  rgl::open3d()
+                  rgl::rgl.surface(X, Y, Z, color=zcolor, alpha=0.5,back = "lines")
+                  at = 8
+                  at <- do.breaks(range(s_172$z), at)
+                  col <- viridis_pal(option = "cividis")(length(at))
+                  colZ <- level.colors(s_172$z, at=at, col.regions= col)
+                  rgl::rgl.surface(ipl172$x,ipl172$y,ipl172$z+100,color = colZ,alpha = 1,back = "lines")
+            
+                  
+## if I want to overlay a surface over another surface I should make sure that they have same x and Y limit.  
+## for(x in all.sub) X[rownames(x),colnames(x)] <- x
+```
+
+
+
+
+instead of drawing the whole fire what if I plot the primeter of the fires.
+```{r}
+####
+crds_172 <- st_coordinates(st_boundary(bm_firhist %>% 
+  filter(OBJECTID == 172)))[,c(1,2)]
+
+
+
+
+lne_z <- function(X,Y,...){
+  tmp_pnt <- SpatialPoints(cbind(x = X,y = Y),
+                    proj4string = CRS("+proj=utm +zone=55 +south +ellps=GRS80 +units=m +no_defs"))
+  ans <- raster::extract(prj_rstr_dem,tmp_pnt)
+  ans
+}
+
+   
+
+
+prmt_172 <- cbind( x = crds_172[,1],y = crds_172[,2],z = as_tibble(crds_172) %>% 
+   pmap_dbl(lne_z))
+     
+rgl::rgl.close()
+x <- sampleRegular(prj_rstr_dem, size=1e5, asRaster=TRUE)
+                  X <- xFromCol(x,1:ncol(x))
+                  Y <- yFromRow(x, nrow(x):1)
+                  Z <- t((getValues(x, format='matrix'))[nrow(x):1,])
+                  
+                  background <- min(Z, na.rm=TRUE) - 1
+                  Z[is.na(Z)] <- background
+                  
+                  zlim <- range(Z)
+                  zlen <- zlim[2] - zlim[1] + 1
+                  xlen <- max(X) - min(X)
+                  ylen <- max(Y) - min(Y)
+                  at = 8
+                  at <- do.breaks(zlim, at)
+                  col <- viridis_pal(option = "magma",direction = -1)(length(at))
+                  zcolor <- level.colors(Z, at=at, col.regions= col)
+                  rgl::open3d()
+                  rgl::rgl.surface(X, Y, Z, color=zcolor, alpha=0.5,back = "filled")
+                  rgl::plot3d(prmt_172[,1],prmt_172[,2],prmt_172[,3] , type="l", lwd=15)
+                  
+                  
+
+```
+
 
