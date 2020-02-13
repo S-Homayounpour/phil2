@@ -30,9 +30,8 @@ bm_firhist <- read_sf('../Data/BM_modified_TC_FireHist.shp')
 
 
 
-levelplot(blc_mnt, par.settings = BTCTheme )
-
-levelplot(bm,par.settings = GrTheme) 
+levelplot(blc_mnt, par.settings = BTCTheme )+ 
+  levelplot(bm,par.settings = GrTheme) 
   
 
 plot3D(bm)
@@ -42,7 +41,8 @@ plot3D(bm)
 
 
 ggplot()+
-geom_sf(data = bm_firhist,aes(fill = IGNITION))
+geom_sf(data = bm_firhist,aes(fill = IGNITION))+
+  geom_sf_text(data = bm_firhist, aes(label = OBJECTID))
 
 
 
@@ -63,12 +63,7 @@ levelplot(bm,par.settings = GrTheme)
 
 ```{r}
 
-extent(bm_firhist %>% 
-  filter(OBJECTID == 172))
 
-
-bm_firhist %>% 
-  filter(OBJECTID == 172)
 
 crs(bm_firhist)
 
@@ -78,11 +73,11 @@ r <- "+proj=utm +zone=55 +south +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no
 crs(bm)
 
 
-
+## change the crs.
 prj_rstr_dem  <- projectRaster(bm,crs = r,method='bilinear')
 
 
-plot3D(prj_rstr_dem)
+t <- crs(bm) 
 
 ```
 
@@ -172,8 +167,7 @@ instead of drawing the whole fire what if I plot the primeter of the fires.
 crds_172 <- st_coordinates(st_boundary(bm_firhist %>% 
   filter(OBJECTID == 172)))[,c(1,2)]
 
-
-
+#### extracting z dimension for boundary points of the fire.
 
 lne_z <- function(X,Y,...){
   tmp_pnt <- SpatialPoints(cbind(x = X,y = Y),
@@ -182,13 +176,10 @@ lne_z <- function(X,Y,...){
   ans
 }
 
-   
-
-
 prmt_172 <- cbind( x = crds_172[,1],y = crds_172[,2],z = as_tibble(crds_172) %>% 
    pmap_dbl(lne_z))
      
-rgl::rgl.close()
+
 x <- sampleRegular(prj_rstr_dem, size=1e5, asRaster=TRUE)
                   X <- xFromCol(x,1:ncol(x))
                   Y <- yFromRow(x, nrow(x):1)
@@ -206,11 +197,92 @@ x <- sampleRegular(prj_rstr_dem, size=1e5, asRaster=TRUE)
                   col <- viridis_pal(option = "magma",direction = -1)(length(at))
                   zcolor <- level.colors(Z, at=at, col.regions= col)
                   rgl::open3d()
-                  rgl::rgl.surface(X, Y, Z, color=zcolor, alpha=0.5,back = "filled")
-                  rgl::plot3d(prmt_172[,1],prmt_172[,2],prmt_172[,3] , type="l", lwd=15)
-                  
-                  
+                  rgl::lines3d(prmt_172[,1],prmt_172[,2],prmt_172[,3] ,color = "red",lwd = 5,smooth = T)
+                  rgl::surface3d(X, Y, Z, color=zcolor, alpha=0.8,back = "filled")
+                  rgl::aspect3d(1, 1, 0.2)
 
 ```
 
+
+
+This function provides a way to visualise the boundary of a fire polygon over a DEM raster. To come up with the first protoype. I faced a problem with coordinate reference system of DEM raster. The problem was finding the right CRS for DEM. The crs is the specific for satelite image provided by google map.
+
+
+
+```{r}
+
+### This function takes a DEM raster and a shape file. 
+### The function assumes that DEM raster and fire shape file overlay. 
+### Maybe this is something that function should check before running.
+### at the moment only one fire preimeter can be displayed
+### the possiblity of plotting more fire will be investigated.
+
+
+
+lne_z <- function(ln,lt,dem,...){
+  tmp_pnt <- SpatialPoints(cbind(x = ln ,y = lt ),
+                    proj4string = CRS("+proj=utm +zone=55 +south +ellps=GRS80 +units=m +no_defs"))
+  ans <- raster::extract(dem,tmp_pnt)
+  ans
+}
+
+## prem is the shapefile that will be used to extract its boundary
+
+prem_over_dem <- function(dem, prem,flat.ratio = 0.3){
+  
+  
+st_crs(bm_firhist)
+r <- "+proj=utm +zone=55 +south +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs"
+crs(bm)
+
+
+## change the crs.
+prj_rstr_dem  <- projectRaster(bm,crs = r,method='bilinear')
+
+#### coordinates of boundaries
+crds_bnd  <- st_coordinates(st_boundary(prem))[,c(1,2)]
+
+
+#### extracting z dimension for boundary points of the fire.
+prmt_hght <- cbind( x = crds_bnd[,1],y = crds_bnd[,2],z = as_tibble(crds_bnd) %>% 
+   pmap_dbl(~lne_z(ln = .x ,lt= .y,dem = dem)))
+     
+
+x <- sampleRegular(dem, size=1e5, asRaster=TRUE)
+                  X <- xFromCol(x,1:ncol(x))
+                  Y <- yFromRow(x, nrow(x):1)
+                  Z <- t((getValues(x, format='matrix'))[nrow(x):1,])
+                  
+                  background <- min(Z, na.rm=TRUE) - 1
+                  Z[is.na(Z)] <- background
+                  
+                  zlim <- range(Z)
+                  zlen <- zlim[2] - zlim[1] + 1
+                  xlen <- max(X) - min(X)
+                  ylen <- max(Y) - min(Y)
+                  at = 8
+                  at <- do.breaks(zlim, at)
+                  col <- viridis_pal(option = "viridis",direction = -1)(length(at))
+                  zcolor <- level.colors(Z, at=at, col.regions= col)
+                  rgl::open3d()
+                  rgl::lines3d(prmt_hght[,1],prmt_hght[,2],prmt_hght[,3] ,color = "red",lwd = 5,smooth = T)
+                  rgl::surface3d(X, Y, Z, color=zcolor, alpha=1,back = "filled")
+                  rgl::aspect3d(1, 1, flat.ratio)
+                  
+                  print(prmt_hght)
+}
+
+
+
+
+prem_over_dem(prj_rstr_dem,bm_firhist %>% 
+  filter(OBJECTID == 1362),flat.ratio = 0.25)
+
+ggplot()+
+geom_sf(data = bm_firhist %>% 
+  filter(OBJECTID == 11),aes(fill = IGNITION))
+
+raster::intersect(prj_rstr_dem, bm_firhist %>% filter(OBJECTID == 15))
+
+```
 
