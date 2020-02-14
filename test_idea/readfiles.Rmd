@@ -18,6 +18,8 @@ library(akima)
 library(RColorBrewer)
 library(viridis)
 library(scales)
+library(animation)
+library(png)
 ```
 
 
@@ -65,12 +67,9 @@ levelplot(bm,par.settings = GrTheme)
 
 
 
-crs(bm_firhist)
-
-
 st_crs(bm_firhist)
 r <- "+proj=utm +zone=55 +south +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs"
-crs(bm)
+crs(bm,asText =T )
 
 
 ## change the crs.
@@ -219,9 +218,9 @@ This function provides a way to visualise the boundary of a fire polygon over a 
 
 
 
-lne_z <- function(ln,lt,dem,...){
+lne_z <- function(ln,lt,dem,dem_crs,...){
   tmp_pnt <- SpatialPoints(cbind(x = ln ,y = lt ),
-                    proj4string = CRS("+proj=utm +zone=55 +south +ellps=GRS80 +units=m +no_defs"))
+                    proj4string = CRS(dem_crs))
   ans <- raster::extract(dem,tmp_pnt)
   ans
 }
@@ -230,14 +229,11 @@ lne_z <- function(ln,lt,dem,...){
 
 prem_over_dem <- function(dem, prem,flat.ratio = 0.3){
   
-  
-st_crs(bm_firhist)
-r <- "+proj=utm +zone=55 +south +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs"
-crs(bm)
+if( !is.na(st_crs(prem)) & !is.na(crs(dem))){  
 
-
+dem_crs <- crs(dem,asText = T) 
 ## change the crs.
-prj_rstr_dem  <- projectRaster(bm,crs = r,method='bilinear')
+st_transform(prem,crs = dem_crs)
 
 #### coordinates of boundaries
 crds_bnd  <- st_coordinates(st_boundary(prem))[,c(1,2)]
@@ -245,7 +241,7 @@ crds_bnd  <- st_coordinates(st_boundary(prem))[,c(1,2)]
 
 #### extracting z dimension for boundary points of the fire.
 prmt_hght <- cbind( x = crds_bnd[,1],y = crds_bnd[,2],z = as_tibble(crds_bnd) %>% 
-   pmap_dbl(~lne_z(ln = .x ,lt= .y,dem = dem)))
+   pmap_dbl(~lne_z(ln = .x ,lt= .y,dem = dem ,dem_crs = )))
      
 
 x <- sampleRegular(dem, size=1e5, asRaster=TRUE)
@@ -270,13 +266,24 @@ x <- sampleRegular(dem, size=1e5, asRaster=TRUE)
                   rgl::aspect3d(1, 1, flat.ratio)
                   
                   print(prmt_hght)
+  }
 }
 
 
 
 
-prem_over_dem(prj_rstr_dem,bm_firhist %>% 
-  filter(OBJECTID == 1362),flat.ratio = 0.25)
+
+prem_over_dem(bm,bm_firhist %>% 
+  filter(OBJECTID == 172),flat.ratio = 0.25) 
+rgl::rgl.viewpoint(20, -50)
+
+## printing snapshots of rgl plots as png files.
+# for (i in 1:45) {
+#   rgl::rgl.viewpoint(20, -50+i)
+#   filename <- paste("pic", formatC(i, digits = 1, flag = "0"), ".png", sep = "")
+#   rgl::rgl.snapshot(filename)
+# }
+
 
 ggplot()+
 geom_sf(data = bm_firhist %>% 
@@ -284,5 +291,23 @@ geom_sf(data = bm_firhist %>%
 
 raster::intersect(prj_rstr_dem, bm_firhist %>% filter(OBJECTID == 15))
 
+```
+
+```{r}
+
+
+
+rgl::shade3d(rgl::oh3d(), color = "red")
+rgl::rgl.bringtotop()
+rgl::rgl.viewpoint(0, 20)
+
+
+
+
+# library(animation)
+# ## make sure ImageMagick has been installed in your system
+# saveGIF({
+#   for (i in 1:10) plot(runif(10), ylim = 0:1)
+# })
 ```
 
