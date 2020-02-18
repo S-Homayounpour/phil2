@@ -29,7 +29,9 @@ bm <- raster('../Data/BM.tif')
 bm_firhist <- read_sf('../Data/BM_modified_TC_FireHist.shp')
 
 
-
+bm_firhist %>% 
+  filter(Type == "PB") %>% 
+  filter(YEARNUM <2013 & YEARNUM > 2005)
 
 
 levelplot(blc_mnt, par.settings = BTCTheme )+ 
@@ -215,6 +217,7 @@ This function provides a way to visualise the boundary of a fire polygon over a 
 ### Maybe this is something that function should check before running.
 ### at the moment only one fire preimeter can be displayed
 ### the possiblity of plotting more fire will be investigated.
+### add a test to see if selected shapefile intersect with the DEM raster
 
 
 
@@ -310,4 +313,33 @@ rgl::rgl.viewpoint(0, 20)
 #   for (i in 1:10) plot(runif(10), ylim = 0:1)
 # })
 ```
+ This function outputs a raster based on some criteria.
+ 
+```{r}
 
+
+
+
+bm_firhist %>% 
+  filter(Type == "PB") %>% 
+  filter(YEARNUM <2013 & YEARNUM > 2005) 
+
+
+
+
+
+
+
+r <- raster::raster(nrows = 10,ncols = 10,crs = "+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0 +k=1.0 +units=m +nadgrids=@null +no_defs")
+
+
+rgdal::projInfo(type = "units")
+
+
+# hist_rast <- function(shpfile = NULL, cellSize = 25, snapRaster = NULL,oldestfire = NULL){
+#   
+#   
+# }
+```
+ 
+ 
